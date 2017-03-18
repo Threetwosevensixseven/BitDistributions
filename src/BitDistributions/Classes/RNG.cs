@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using freakcode.Cryptography;
 
-namespace BitDistributions.Classes
+namespace Threetwosevensixseven.BitDistributions.Classes
 {
      /// <summary>
      /// Abstract wrapper class for <see cref="Random">System.Random</see> 
