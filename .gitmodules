@@ -1,0 +1,3 @@
+[submodule "src/submodules/CryptoRandom"]
+	path = src/submodules/CryptoRandom
+	url = https://gist.github.com/niik/1017834

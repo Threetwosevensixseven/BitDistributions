@@ -43,7 +43,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Distribution.cs" />
+    <Compile Include="..\submodules\CryptoRandom\CryptoRandom.cs">
+      <Link>Classes\CryptoRandom.cs</Link>
+    </Compile>
+    <Compile Include="Classes\RNG.cs" />
+    <Compile Include="Classes\Distribution.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

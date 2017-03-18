@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BitDistributions
+namespace BitDistributions.Classes
 {
      public class Distribution
      {
@@ -177,7 +177,7 @@ namespace BitDistributions
           private bool zeroBitAssigned;
           private int populated;
           private int stuckCount;
-          private Random rng = new Random();
+          private RNG rng = new RNG();
 
           private void Recalculate()
           {
