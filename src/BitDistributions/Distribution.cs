@@ -1,0 +1,286 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace BitDistributions
+{
+     public class Distribution
+     {
+          #region Public
+
+          public int Variance;
+
+          public Distribution(bool Random = true, int ZeroBit = 7)
+          {
+               zeroBit = ZeroBit;
+               zeroBitAssigned = false;
+               if (Random)
+               {
+                    table = new byte[LEN];
+                    populated = 0;
+                    bitBuckets = new Dictionary<int, Dictionary<int, bool>>();
+                    for (int j = 0; j < BITS; j++)
+                         bitBuckets.Add(j, new Dictionary<int, bool>());
+                    for (int i = 0; i < LEN; i++)
+                         for (int j = 0; j < BITS; j++)
+                         {
+                              int val = Convert.ToInt32(Math.Pow(2, j));                         
+                              if ((i & val) == val)
+                                   bitBuckets[j].Add(i, false);
+                         }
+               }
+               else
+               {
+                    table = INIT;
+                    populated = LEN;
+               }
+               bitTotals = new int[BITS];
+               matrix = new int[BITS, BITS];
+               matrixTotals = new int[BITS];
+               matrixVariances = new int[BITS];
+               matrixAbsVariances = new int[BITS];
+               powers = new Dictionary<int, int>();
+               for (int i = 0; i < BITS; i++)
+                    powers.Add(Convert.ToInt32(Math.Pow(2, i)), i);
+               Recalculate();
+          }
+
+          public bool Swap()
+          {
+               if (populated < LEN)
+               {
+                    Populate();
+                    Recalculate();
+                    return false;
+               }
+               int var = Variance;
+               int sourceRow = 0, targetRow = 0;
+               byte sourceVal = 0, targetVal = 0;
+               bool match;
+               do
+               {
+                    sourceRow = rng.Next(256);
+                    sourceVal = table[sourceRow];
+                    match = GetTarget(sourceRow, sourceVal, ref targetRow, ref targetVal);
+               }
+               while (!match);
+               SwapValues(sourceRow, targetRow);
+               Recalculate();
+               if (Variance < var)
+                    return true;
+               SwapValues(sourceRow, targetRow);
+               Recalculate();
+               return false;
+          }
+
+          public override string ToString()
+          {
+               var sb = new StringBuilder();
+               sb.AppendLine("                       Bit7  Bit6  Bit5  Bit4  Bit3  Bit2  Bit1  Bit0      TOTAL");
+               sb.AppendLine();
+               sb.Append("Bit Totals:          ");
+               for (int i = BITS - 1; i >= 0; i--)
+                    sb.Append(bitTotals[i].ToString().PadLeft(6));
+               sb.Append("     ");
+               sb.AppendLine(bitTotals.Sum().ToString().PadLeft(6));
+               sb.AppendLine();
+               for (int i = BITS - 1; i >= 0; i--)
+               {
+                    sb.Append("Matrix (");
+                    sb.Append(i);
+                    sb.Append("):          ");
+                    int bTotal = 0;
+                    for (int j = BITS - 1; j >= 0; j--)
+                    {
+                         sb.Append(matrix[i, j].ToString().PadLeft(6));
+                         bTotal += matrix[i, j];
+                    }
+                    sb.Append("     ");
+                    sb.AppendLine(bTotal.ToString().PadLeft(6));
+               }
+               sb.AppendLine("                     ─────────────────────────────────────────────────────────────");
+               sb.Append("Matrix Totals:       ");
+               int mTotal = 0;
+               for (int i = BITS - 1; i >= 0; i--)
+               {
+                    sb.Append(matrixTotals[i].ToString().PadLeft(6));
+                    mTotal += matrixTotals[i];
+               }
+               sb.Append("     ");
+               sb.AppendLine(mTotal.ToString().PadLeft(6));
+               sb.AppendLine();
+               sb.Append("Matrix Variances:    ");
+               for (int i = BITS - 1; i >= 0; i--)
+                    sb.Append(matrixVariances[i].ToString().PadLeft(6));
+               sb.AppendLine();
+               sb.AppendLine("                                                                         ╔═══════╗");
+               sb.Append("Matrix Abs Variances:");
+               for (int i = BITS - 1; i >= 0; i--)
+                    sb.Append(matrixAbsVariances[i].ToString().PadLeft(6));
+               sb.Append("    ║");
+               sb.Append(Variance.ToString().PadLeft(6));
+               sb.AppendLine(" ║");
+               sb.AppendLine("                                                                         ╚═══════╝");
+               return sb.ToString();
+          }
+
+          public string RenderTable(bool PowersOfTwo)
+          {
+               var sb = new StringBuilder();
+               int cols = BITS * 2;
+               int rows = LEN / cols;
+               int index = 0;
+               for (int i = 0; i < rows; i++)
+               {
+                    string join = "";
+                    sb.Append("     db ");
+                    for (int j = 0; j < cols; j++)
+                    {
+                         sb.Append(join);
+                         if (PowersOfTwo)
+                         {
+                              sb.Append("$");
+                              sb.Append(table[index++].ToString("X2"));
+                         }
+                         else
+                         {
+                              sb.Append(powers[table[index++]]);
+                         }
+                         join = ", ";
+                    }
+                    sb.AppendLine();
+               }
+               return sb.ToString();
+          }
+
+          #endregion
+
+          #region Private
+
+          private byte[] INIT = new byte[] { 2, 1, 2, 1, 4, 4, 2, 1, 8, 8, 2, 2, 4, 1, 8, 1, 16, 1, 16, 16, 4, 16, 16, 4,
+               8, 16, 8, 2, 16, 8, 16, 16, 32, 32, 32, 2, 4, 4, 2, 2, 32, 8, 32, 1, 4, 8, 32, 32, 16, 32, 2, 32, 16, 4,
+               32, 16, 16, 32, 16, 16, 8, 1, 2, 16, 64, 1, 64, 64, 64, 1, 2, 2, 64, 8, 64, 8, 8, 8, 64, 4, 16, 1, 2, 1,
+               64, 1, 64, 64, 16, 64, 64, 8, 4, 8, 16, 8, 64, 32, 2, 1, 4, 32, 4, 1, 8, 32, 8, 8, 4, 1, 64, 64, 16, 1, 64,
+               64, 64, 32, 32, 2, 16, 64, 2, 2, 4, 64, 2, 8, 128, 1, 128, 128, 128, 128, 2, 4, 8, 128, 128, 8, 4, 1, 2, 1,
+               16, 16, 2, 1, 4, 128, 4, 16, 8, 128, 16, 8, 128, 4, 128, 2, 32, 1, 32, 32, 4, 32, 2, 128, 128, 32, 32, 8,
+               4, 4, 128, 32, 32, 16, 128, 32, 32, 128, 4, 4, 128, 32, 128, 8, 4, 1, 8, 16, 128, 128, 128, 64, 64, 64, 4,
+               2, 8, 128, 8, 64, 8, 4, 2, 4, 64, 1, 2, 16, 128, 64, 128, 64, 64, 16, 8, 2, 16, 128, 64, 4, 128, 1, 2, 2,
+               64, 128, 128, 32, 128, 1, 64, 32, 128, 1, 4, 1, 32, 1, 2, 1, 4, 1, 128, 16, 64, 1, 32, 2, 8, 16, 32, 128 };
+          private const int LEN = 256;
+          private const int BITS = 8;
+          private readonly byte[] table;
+          private readonly int[] bitTotals;
+          private readonly int[,] matrix;
+          private readonly int[] matrixTotals;
+          private readonly int[] matrixVariances;
+          private readonly int[] matrixAbsVariances;
+          private readonly Dictionary<int, Dictionary<int, bool>> bitBuckets;
+          private readonly Dictionary<int, int> powers;
+          private readonly int zeroBit;
+          private bool zeroBitAssigned;
+          private int populated;
+          private Random rng = new Random();
+
+          private void Recalculate()
+          {
+               for (int i = 0; i < BITS; i++)
+                    bitTotals[i] = table.Sum(v => Bit(i, v));
+               for (int i = 0; i < BITS; i++)
+               {
+                    for (int j = 0; j < BITS; j++)
+                    {
+                         matrix[i, j] = 0;
+                         for (int k = 0; k < LEN; k++)
+                              matrix[i, j] += Bit(j, table[k]) & Bit(i, k);
+                    }
+               }
+               int mTotal = 0;
+               for (int i = 0; i < BITS; i++)
+               {
+                    matrixTotals[i] = 0;
+                    for (int j = 0; j < BITS; j++)
+                         matrixTotals[i] += matrix[j, i];
+                    mTotal += matrixTotals[i];
+               }
+               int mAvg = mTotal / BITS;
+               Variance = 0;
+               for (int i = 0; i < BITS; i++)
+               {
+                    matrixVariances[i] = matrixTotals[i] - mAvg;
+                    matrixAbsVariances[i] = Math.Abs(matrixVariances[i]);
+                    Variance += matrixAbsVariances[i];
+               }
+          }
+
+          private int Bit(int BitNo, Byte Value)
+          {
+               return (Value & (1 << BitNo)) != 0 ? 1 : 0;
+          }
+
+          private int Bit(int BitNo, int Value)
+          {
+               return (Value & (1 << BitNo)) != 0 ? 1 : 0;
+          }
+
+          private bool GetTarget(int SourceRow, int SourceVal, ref int TargetRow, ref byte TargetVal)
+          {
+               do
+               {
+                    TargetRow = rng.Next(256);
+               }
+               while (TargetRow == SourceRow);
+               TargetVal = table[TargetRow];
+               return ((SourceRow & TargetVal) == TargetVal)
+                    && ((TargetRow & SourceVal) == SourceVal);
+          }
+
+          private void SwapValues(int SourceRow, int TargetRow)
+          {
+               byte temp = table[TargetRow];
+               table[TargetRow] = table[SourceRow];
+               table[SourceRow] = temp;
+          }
+
+          private void Populate()
+          {
+               if (populated >= LEN)
+                    return;
+
+               int count = 0;
+               do
+               {
+                    for (int i = 0; i < BITS; i++)
+                    {
+                         byte val = Convert.ToByte(Math.Pow(2, i));
+                         if (populated > count++)
+                              continue;
+                         if (bitTotals[i] > 32)
+                              continue;
+                         if (!zeroBitAssigned && i == zeroBit)
+                         {
+                              table[0] = val;
+                              populated++;
+                              zeroBitAssigned = true;
+                              continue;
+                         }
+                         var skip = rng.Next(bitBuckets[i].Count);
+                         int index = bitBuckets[i].Keys.Skip(skip).FirstOrDefault();
+                         if (index == 0)
+                              continue;
+                         table[index] = val;
+                         for (int k = 0; k < BITS; k++)
+                              if (bitBuckets[k].ContainsKey(index))
+                                   bitBuckets[k].Remove(index);
+                         populated++;
+                         Recalculate();
+                         return;
+                    }
+               }
+               while (true);
+          }
+
+          #endregion
+     }
+}
