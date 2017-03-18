@@ -11,11 +11,22 @@ namespace Threetwosevensixseven.BitDistributions.Classes
           #region Public
 
           public int Variance;
+          public int MatrixVariance;
+          public int BestMatrixVariance;
+          public int Minimum;
+          public int BestMinimum;
+          public int Maximum;
+          public int BestMaximum;
+          public bool Improvement;
+          public bool Abandon;
 
           public Distribution(bool Random = true, int ZeroBit = 7)
           {
                zeroBit = ZeroBit;
                zeroBitAssigned = false;
+               BestMatrixVariance = int.MaxValue;
+               BestMaximum = int.MaxValue;
+               Improvement = false;
                if (Random)
                {
                     table = new byte[LEN];
@@ -177,6 +188,7 @@ namespace Threetwosevensixseven.BitDistributions.Classes
           private bool zeroBitAssigned;
           private int populated;
           private int stuckCount;
+          private int fixCount;
           private RNG rng = new RNG();
 
           private void Recalculate()
@@ -208,6 +220,17 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                     matrixAbsVariances[i] = Math.Abs(matrixVariances[i]);
                     Variance += matrixAbsVariances[i];
                }
+               if (populated == LEN && Variance == 0)
+               {
+                    Minimum = matrix.Cast<int>().Min();
+                    Maximum = matrix.Cast<int>().Max(m => m >= 31 ? int.MinValue : m);
+                    MatrixVariance = matrix.Cast<int>().Sum(m => Math.Abs(m >= 31 ? 0 : (m - 16)));
+                    Improvement = (Minimum > BestMinimum) || (Maximum < BestMaximum) || (MatrixVariance < BestMatrixVariance);
+                    BestMinimum = BestMinimum > Minimum ? BestMinimum : Minimum;
+                    BestMaximum = BestMaximum < Maximum ? BestMaximum : Maximum;
+                    BestMatrixVariance = BestMatrixVariance > MatrixVariance ? BestMatrixVariance : MatrixVariance;
+               }
+               else Improvement = false;
           }
 
           private int Bit(int BitNo, Byte Value)
@@ -272,8 +295,9 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                          int index = bitBuckets[i].Keys.Skip(skip).FirstOrDefault();
                          if (index == 0)
                          {
+
                               stuckCount++;
-                              if (stuckCount >= 10)
+                              if (stuckCount >= 100)
                               {
                                    Recalculate();
                                    List<int> candidates = new List<int>();
@@ -293,7 +317,11 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                                    table[remove] = 0;
                                    AddToBitBuckets(remove);
                                    populated--;
+                                   stuckCount = 0;
+                                   fixCount++;
                                    Recalculate();
+                                   if (fixCount > 1000)
+                                        Abandon = true;
                                    return;
                               }
                               continue;
@@ -314,7 +342,7 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                for (int j = 0; j < BITS; j++)
                {
                     int pow = Convert.ToInt32(Math.Pow(2, j));
-                    if ((Value & pow) == pow)
+                    if ((Value & pow) == pow && !bitBuckets[j].ContainsKey(Value))
                          bitBuckets[j].Add(Value, false);
                }
           }

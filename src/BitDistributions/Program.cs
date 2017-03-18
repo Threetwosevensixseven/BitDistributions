@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
 
 namespace Threetwosevensixseven.BitDistributions
 {
@@ -26,18 +27,41 @@ namespace Threetwosevensixseven.BitDistributions
                DateTime time = DateTime.Now;
                do
                {
-                    d.Swap();
-                    Console.SetCursorPosition(0, 2);
-                    Console.WriteLine(d.ToString());
-                    Console.WriteLine("Calculating" + new string('.', frame) + new string(' ', 10));
-                    if ((DateTime.Now - time).TotalMilliseconds >= 500)
+                    do
                     {
-                         frame++;
-                         if (frame > 3) frame = 0;
-                         time = DateTime.Now;
+                         d.Swap();
+                         Console.SetCursorPosition(0, 2);
+                         Console.WriteLine(d.ToString());
+                         Console.WriteLine("Calculating" + new string('.', frame) + new string(' ', 10));
+                         if ((DateTime.Now - time).TotalMilliseconds >= 500)
+                         {
+                              frame++;
+                              if (frame > 3) frame = 0;
+                              time = DateTime.Now;
+                         }
+                    }
+                    while (d.Variance > 0 && !d.Abandon);
+                    if (d.Improvement && !d.Abandon)
+                    {
+                         string file = d.MatrixVariance.ToString("D3") + "-" + d.Minimum.ToString("D2") + "-" + d.Maximum.ToString("D2") + ".txt";
+                         string dir = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tables");
+                         string fn = Path.Combine(dir, file);
+                         if (!File.Exists(fn))
+                         {
+                              if (!Directory.Exists(dir))
+                                   Directory.CreateDirectory(dir);
+                              var sb = new StringBuilder();
+                              sb.AppendLine(d.ToString());
+                              sb.AppendLine(d.RenderTable(true));
+                              sb.AppendLine(d.RenderTable(false));
+                              File.WriteAllText(Path.Combine(dir, file), sb.ToString());
+                         }
+                         d = new Distribution();
+                         GC.Collect();
+                         GC.Collect();
                     }
                }
-               while (d.Variance > 0);
+               while (d.BestMatrixVariance > 0);
                Console.Clear();
                Console.WriteLine("BitDistributions v" + versionInfo.ProductVersion);
                Console.SetCursorPosition(0, 2);
