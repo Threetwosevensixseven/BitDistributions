@@ -24,12 +24,7 @@ namespace BitDistributions
                     for (int j = 0; j < BITS; j++)
                          bitBuckets.Add(j, new Dictionary<int, bool>());
                     for (int i = 0; i < LEN; i++)
-                         for (int j = 0; j < BITS; j++)
-                         {
-                              int val = Convert.ToInt32(Math.Pow(2, j));                         
-                              if ((i & val) == val)
-                                   bitBuckets[j].Add(i, false);
-                         }
+                         AddToBitBuckets(i);
                }
                else
                {
@@ -68,7 +63,7 @@ namespace BitDistributions
                while (!match);
                SwapValues(sourceRow, targetRow);
                Recalculate();
-               if (Variance < var)
+               if (Variance <= var)
                     return true;
                SwapValues(sourceRow, targetRow);
                Recalculate();
@@ -181,6 +176,7 @@ namespace BitDistributions
           private readonly int zeroBit;
           private bool zeroBitAssigned;
           private int populated;
+          private int stuckCount;
           private Random rng = new Random();
 
           private void Recalculate()
@@ -256,8 +252,15 @@ namespace BitDistributions
                          byte val = Convert.ToByte(Math.Pow(2, i));
                          if (populated > count++)
                               continue;
-                         if (bitTotals[i] > 32)
+                         if (bitTotals[i] >= 32)
+                         {
+                              //stuckCount++;
+                              //if (stuckCount >= 100)
+                              //{
+                                   //return;
+                              //}
                               continue;
+                         }
                          if (!zeroBitAssigned && i == zeroBit)
                          {
                               table[0] = val;
@@ -268,17 +271,75 @@ namespace BitDistributions
                          var skip = rng.Next(bitBuckets[i].Count);
                          int index = bitBuckets[i].Keys.Skip(skip).FirstOrDefault();
                          if (index == 0)
+                         {
+                              stuckCount++;
+                              if (stuckCount >= 10)
+                              {
+                                   Recalculate();
+                                   List<int> candidates = new List<int>();
+                                   do
+                                   {
+                                        int minBit = GetRandomMinMaxBit(false);
+                                        int maxBit = GetRandomMinMaxBit(true, minBit);
+                                        byte minVal = Convert.ToByte(Math.Pow(2, minBit));
+                                        byte maxVal = Convert.ToByte(Math.Pow(2, maxBit));
+                                        for (int j = 0; j < LEN; j++)
+                                             if (((j & minVal) == minVal) && ((j & maxVal) == maxVal))
+                                                  candidates.Add(j);
+                                   }
+                                   while (candidates.Count == 0);
+                                   var remove = candidates.Skip(rng.Next(candidates.Count)).First();
+                                   byte rVal = table[remove];
+                                   table[remove] = 0;
+                                   AddToBitBuckets(remove);
+                                   populated--;
+                                   Recalculate();
+                                   return;
+                              }
                               continue;
+                         }
                          table[index] = val;
-                         for (int k = 0; k < BITS; k++)
-                              if (bitBuckets[k].ContainsKey(index))
-                                   bitBuckets[k].Remove(index);
+                         RemoveFromBitBuckets(index);
                          populated++;
+                         stuckCount = 0;
                          Recalculate();
                          return;
                     }
                }
                while (true);
+          }
+
+          private void AddToBitBuckets(int Value)
+          {
+               for (int j = 0; j < BITS; j++)
+               {
+                    int pow = Convert.ToInt32(Math.Pow(2, j));
+                    if ((Value & pow) == pow)
+                         bitBuckets[j].Add(Value, false);
+               }
+          }
+
+          private void RemoveFromBitBuckets(int Value)
+          {
+               for (int k = 0; k < BITS; k++)
+                    if (bitBuckets[k].ContainsKey(Value))
+                         bitBuckets[k].Remove(Value);
+          }
+
+          private int GetRandomMinMaxBit(bool Max, int Except = -1)
+          {
+               int comp = Max ? bitTotals.Max() : bitTotals.Min();
+               List<int> maxs = new List<int>();
+               for (int j = 0; j < BITS; j++)
+                    if (bitTotals[j] == comp)
+                         maxs.Add(j);
+               int max;
+               do
+               {
+                    max = maxs.Skip(rng.Next(maxs.Count)).First();
+               }
+               while (max == Except);
+               return max;
           }
 
           #endregion
