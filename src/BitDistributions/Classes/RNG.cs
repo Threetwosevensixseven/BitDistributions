@@ -39,7 +39,7 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                return rng.Next(maxValue);
           }
 
-          public int Nextx(int minValue, int maxValue)
+          public int Next(int minValue, int maxValue)
           {
                return rng.Next(maxValue, maxValue);
           }

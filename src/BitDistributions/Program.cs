@@ -41,24 +41,41 @@ namespace Threetwosevensixseven.BitDistributions
                          }
                     }
                     while (d.Variance > 0 && !d.Abandon);
-                    if (d.Improvement && !d.Abandon)
+                    if (!d.Abandon)
                     {
-                         string file = d.MatrixVariance.ToString("D3") + "-" + d.Minimum.ToString("D2") + "-" + d.Maximum.ToString("D2") + ".txt";
-                         string dir = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tables");
-                         string fn = Path.Combine(dir, file);
-                         if (!File.Exists(fn))
+                         do
                          {
-                              if (!Directory.Exists(dir))
-                                   Directory.CreateDirectory(dir);
-                              var sb = new StringBuilder();
-                              sb.AppendLine(d.ToString());
-                              sb.AppendLine(d.RenderTable(true));
-                              sb.AppendLine(d.RenderTable(false));
-                              File.WriteAllText(Path.Combine(dir, file), sb.ToString());
+                              d.Statistics();
+                              Console.SetCursorPosition(0, 2);
+                              Console.WriteLine(d.ToString());
+                              Console.WriteLine("Calculating" + new string('.', frame) + new string(' ', 10));
+                              if ((DateTime.Now - time).TotalMilliseconds >= 500)
+                              {
+                                   frame++;
+                                   if (frame > 3) frame = 0;
+                                   time = DateTime.Now;
+                              }
                          }
-                         d = new Distribution();
-                         GC.Collect();
-                         GC.Collect();
+                         while (!d.FinishedStatistics);
+                         if (d.Improvement)
+                         {
+                              string file = d.MatrixVariance.ToString("D3") + "-" + d.Minimum.ToString("D2") + "-" + d.Maximum.ToString("D2") + ".txt";
+                              string dir = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "tables");
+                              string fn = Path.Combine(dir, file);
+                              if (!File.Exists(fn))
+                              {
+                                   if (!Directory.Exists(dir))
+                                        Directory.CreateDirectory(dir);
+                                   var sb = new StringBuilder();
+                                   sb.AppendLine(d.ToString());
+                                   sb.AppendLine(d.RenderTable(true));
+                                   sb.AppendLine(d.RenderTable(false));
+                                   File.WriteAllText(Path.Combine(dir, file), sb.ToString());
+                              }
+                              d = new Distribution();
+                              GC.Collect();
+                              GC.Collect();
+                         }
                     }
                }
                while (d.BestMatrixVariance > 0);

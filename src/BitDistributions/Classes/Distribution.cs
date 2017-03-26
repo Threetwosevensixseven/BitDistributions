@@ -19,8 +19,9 @@ namespace Threetwosevensixseven.BitDistributions.Classes
           public int BestMaximum;
           public bool Improvement;
           public bool Abandon;
+          public bool FinishedStatistics;
 
-          public Distribution(bool Random = true, int ZeroBit = 7)
+          public Distribution(bool Random = true, int ZeroBit = 6)
           {
                zeroBit = ZeroBit;
                zeroBitAssigned = false;
@@ -47,6 +48,8 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                matrixTotals = new int[BITS];
                matrixVariances = new int[BITS];
                matrixAbsVariances = new int[BITS];
+               statsHits = new double[BITS, BITS];
+               statsCounts = new double[BITS, BITS];
                powers = new Dictionary<int, int>();
                for (int i = 0; i < BITS; i++)
                     powers.Add(Convert.ToInt32(Math.Pow(2, i)), i);
@@ -129,6 +132,29 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                sb.Append(Variance.ToString().PadLeft(6));
                sb.AppendLine(" ║");
                sb.AppendLine("                                                                         ╚═══════╝");
+               {
+                    sb.AppendLine();
+                    for (int i = BITS - 1; i >= 0; i--)
+                    {
+                         sb.Append("Statistics (");
+                         sb.Append(i);
+                         sb.Append("):          ");
+                         for (int j = BITS - 1; j >= 0; j--)
+                         {
+                              if (populated == LEN && Variance == 0 && !Abandon)
+                              {
+                                   double pct = statsCounts[i, j] == 0 ? 0 : (100 * statsHits[i, j] / statsCounts[i, j]);
+                                   sb.Append(pct.ToString("##0.0").PadLeft(7));
+                              }
+                              else
+                              {
+                                   sb.Append("       ");
+                              }
+                         }
+                         sb.AppendLine("    ");
+                    }
+               }
+               FinishedStatistics = (statsCount > 5000);
                return sb.ToString();
           }
 
@@ -161,6 +187,25 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                return sb.ToString();
           }
 
+          public void Statistics()
+          {
+               int index = rng.Next(255) + 1;
+               int val = table[index];
+               int bits = 0;
+               for (int i = 0; i < BITS; i++)
+                    if (Bit(i, index) == 1)
+                         bits++;
+               bits--;
+               for (int i = 0; i < BITS; i++)
+               {
+                    if (Bit(i, val) == 1)
+                         statsHits[bits, i]++;
+                    if (Bit(i, index) == 1)
+                         statsCounts[bits, i]++;
+               }
+               statsCount++;
+          }
+
           #endregion
 
           #region Private
@@ -182,6 +227,8 @@ namespace Threetwosevensixseven.BitDistributions.Classes
           private readonly int[] matrixTotals;
           private readonly int[] matrixVariances;
           private readonly int[] matrixAbsVariances;
+          private readonly double[,] statsCounts;
+          private readonly double[,] statsHits;
           private readonly Dictionary<int, Dictionary<int, bool>> bitBuckets;
           private readonly Dictionary<int, int> powers;
           private readonly int zeroBit;
@@ -189,6 +236,7 @@ namespace Threetwosevensixseven.BitDistributions.Classes
           private int populated;
           private int stuckCount;
           private int fixCount;
+          private int statsCount;
           private RNG rng = new RNG();
 
           private void Recalculate()
@@ -276,14 +324,7 @@ namespace Threetwosevensixseven.BitDistributions.Classes
                          if (populated > count++)
                               continue;
                          if (bitTotals[i] >= 32)
-                         {
-                              //stuckCount++;
-                              //if (stuckCount >= 100)
-                              //{
-                                   //return;
-                              //}
                               continue;
-                         }
                          if (!zeroBitAssigned && i == zeroBit)
                          {
                               table[0] = val;
